@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it } from 'vitest';
-import { clearBreakFreeData, daysSinceGoalStarted, loadCheckIns, saveCheckIns, saveProfile } from './storage';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { clearBreakFreeData, daysSinceGoalStarted, loadCheckIns, loadProfile, saveCheckIns, saveProfile, STORAGE_UNAVAILABLE_MESSAGE } from './storage';
 
 describe('local progress storage', () => {
   beforeEach(() => window.localStorage.clear());
@@ -24,5 +24,56 @@ describe('local progress storage', () => {
     expect(window.localStorage.getItem('breakfree.profile')).toBeNull();
     expect(loadCheckIns()).toEqual([]);
     expect(window.localStorage.getItem('unrelated.preference')).toBe('keep-me');
+  });
+
+  it('discards malformed persisted data instead of exposing it to the UI', () => {
+    window.localStorage.setItem('breakfree.profile', JSON.stringify({ habitName: 'Only one field' }));
+    window.localStorage.setItem('breakfree.checkins', JSON.stringify([{ id: 'one', mood: 99 }]));
+
+    expect(loadProfile()).toBeNull();
+    expect(loadCheckIns()).toEqual([]);
+    expect(window.localStorage.getItem('breakfree.profile')).toBeNull();
+    expect(window.localStorage.getItem('breakfree.checkins')).toBeNull();
+  });
+
+  it('keeps local history bounded', () => {
+    saveCheckIns(Array.from({ length: 91 }, (_, index) => ({
+      id: String(index),
+      date: '2026-07-18',
+      mood: 3,
+      trigger: 'stress',
+      resisted: index % 2 === 0,
+    })));
+
+    expect(loadCheckIns()).toHaveLength(90);
+  });
+
+  it('discards impossible calendar dates', () => {
+    window.localStorage.setItem('breakfree.profile', JSON.stringify({
+      habitName: 'Scrolling',
+      trigger: 'Stress',
+      goal: 'Read',
+      riskTime: 'Night',
+      startDate: '2026-02-30',
+    }));
+
+    expect(loadProfile()).toBeNull();
+    expect(daysSinceGoalStarted('2026-02-30')).toBe(0);
+  });
+
+  it('returns a controlled error when storage writes fail', () => {
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('quota exceeded');
+    });
+
+    const outcome = saveProfile({
+      habitName: 'Scrolling',
+      trigger: 'Stress',
+      goal: 'Read',
+      riskTime: 'Night',
+      startDate: '2026-07-18',
+    });
+
+    expect(outcome).toEqual({ ok: false, message: STORAGE_UNAVAILABLE_MESSAGE });
   });
 });

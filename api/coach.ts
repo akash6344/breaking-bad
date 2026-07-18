@@ -1,30 +1,23 @@
-type Action = 'sos' | 'checkin' | 'weekly';
-
-interface Profile {
-  habitName: string;
-  trigger: string;
-  goal: string;
-  riskTime: string;
-  startDate: string;
-}
-
-interface CheckIn {
-  date: string;
-  mood: number;
-  trigger: string;
-  resisted: boolean;
-}
+import {
+  MAX_HISTORY,
+  MAX_REQUEST_BYTES,
+  MAX_TEXT_LENGTH,
+  validateCoachResponseData,
+  type CoachAction,
+  type CoachCheckIn,
+  type HabitProfile,
+} from '../src/lib/coach-contract';
 
 interface ValidRequest {
-  action: Action;
-  profile: Profile;
+  action: CoachAction;
+  profile: HabitProfile;
   intensity?: number;
-  checkIn?: Omit<CheckIn, 'date'>;
-  history: CheckIn[];
+  checkIn?: Omit<CoachCheckIn, 'date'>;
+  history: CoachCheckIn[];
 }
 
-const MAX_TEXT_LENGTH = 160;
-const MAX_HISTORY = 7;
+const SOS_DEADLINE_MS = 5_000;
+const STANDARD_DEADLINE_MS = 8_000;
 
 function cleanText(value: unknown): string | null {
   if (typeof value !== 'string') return null;
@@ -38,7 +31,7 @@ function parseRequest(input: unknown): ValidRequest | null {
   if (!['sos', 'checkin', 'weekly'].includes(String(body.action))) return null;
   const rawProfile = body.profile as Record<string, unknown> | undefined;
   if (!rawProfile) return null;
-  const profile: Profile = {
+  const profile: HabitProfile = {
     habitName: cleanText(rawProfile.habitName) ?? '',
     trigger: cleanText(rawProfile.trigger) ?? '',
     goal: cleanText(rawProfile.goal) ?? '',
@@ -71,7 +64,7 @@ function parseRequest(input: unknown): ValidRequest | null {
       })
     : [];
 
-  return { action: body.action as Action, profile, intensity, checkIn, history };
+  return { action: body.action as CoachAction, profile, intensity, checkIn, history };
 }
 
 function promptFor(request: ValidRequest): string {
@@ -95,25 +88,13 @@ function parseJson(raw: string): Record<string, unknown> {
   return parsed as Record<string, unknown>;
 }
 
-function validateResponse(action: Action, value: Record<string, unknown>): Record<string, string> {
-  const fields = action === 'sos'
-    ? ['acknowledgment', 'urgeSurfing', 'replacementAction', 'cognitiveReframe', 'intensityAdvice']
-    : action === 'checkin'
-      ? ['insight', 'nudge', 'ifThenPlan', 'nextCheckinReminder']
-      : ['trend', 'keyInsight', 'strongestDay', 'watchOutFor', 'encouragement'];
-  const result: Record<string, string> = {};
-  for (const field of fields) {
-    const mayBeEmpty = action === 'sos' && field === 'intensityAdvice';
-    if (typeof value[field] !== 'string' || (!mayBeEmpty && !value[field].trim())) throw new Error('Invalid coach schema');
-    result[field] = value[field].trim().slice(0, 700);
-  }
-  if (action === 'weekly' && !['improving', 'stable', 'struggling'].includes(result.trend)) {
-    throw new Error('Invalid trend');
-  }
-  return result;
+function validateResponse(action: CoachAction, value: Record<string, unknown>): Record<string, string> {
+  const validated = validateCoachResponseData(action, value);
+  if (!validated) throw new Error('Invalid coach schema');
+  return validated;
 }
 
-async function callGemini(prompt: string): Promise<string> {
+async function callGemini(prompt: string, timeoutMs: number): Promise<string> {
   const key = process.env.GEMINI_API_KEY;
   if (!key) throw new Error('Gemini is not configured');
   const model = process.env.GEMINI_MODEL ?? 'gemini-2.0-flash';
@@ -125,7 +106,7 @@ async function callGemini(prompt: string): Promise<string> {
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
       generationConfig: { maxOutputTokens: 400, responseMimeType: 'application/json', temperature: 0.5 },
     }),
-    signal: AbortSignal.timeout(12_000),
+    signal: AbortSignal.timeout(timeoutMs),
   });
   if (!response.ok) throw new Error(`Gemini failed: ${response.status}`);
   const data = await response.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
@@ -134,7 +115,7 @@ async function callGemini(prompt: string): Promise<string> {
   return text;
 }
 
-async function callMistral(prompt: string): Promise<string> {
+async function callMistral(prompt: string, timeoutMs: number): Promise<string> {
   const key = process.env.MISTRAL_API_KEY;
   if (!key) throw new Error('Mistral is not configured');
   const model = process.env.MISTRAL_MODEL ?? 'mistral-small-latest';
@@ -148,7 +129,7 @@ async function callMistral(prompt: string): Promise<string> {
       response_format: { type: 'json_object' },
       messages: [{ role: 'user', content: prompt }],
     }),
-    signal: AbortSignal.timeout(12_000),
+    signal: AbortSignal.timeout(timeoutMs),
   });
   if (!response.ok) throw new Error(`Mistral failed: ${response.status}`);
   const data = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
@@ -162,7 +143,7 @@ function offlineResponse(request: ValidRequest): Record<string, string> {
     return {
       acknowledgment: `It makes sense that ${request.profile.habitName} feels tempting right now—an urge is a feeling, not an instruction.`,
       urgeSurfing: 'For one minute, plant both feet on the floor. Slowly breathe in for four, hold for four, and out for six while noticing where the urge feels strongest.',
-      replacementAction: 'Put your phone in another room and drink a glass of water while standing by a window.',
+      replacementAction: 'Change rooms, drink a glass of water, and spend one minute with both feet on the floor before deciding what to do next.',
       cognitiveReframe: 'I can let this wave pass without acting on it.',
       intensityAdvice: request.intensity && request.intensity >= 7 ? 'If you feel unsafe or might harm yourself, contact local emergency services or a trusted person now.' : '',
     };
@@ -185,9 +166,23 @@ function offlineResponse(request: ValidRequest): Record<string, string> {
 }
 
 export async function POST(request: Request): Promise<Response> {
+  if (!request.headers.get('content-type')?.toLowerCase().startsWith('application/json')) {
+    return Response.json({ error: 'Content-Type must be application/json' }, { status: 415 });
+  }
+
+  const declaredLength = Number(request.headers.get('content-length'));
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_REQUEST_BYTES) {
+    return Response.json({ error: 'Request is too large' }, { status: 413 });
+  }
+
   let input: unknown;
   try {
-    input = await request.json();
+    // Provider prompts and costs remain bounded even when Content-Length is absent or inaccurate.
+    const body = await request.text();
+    if (new TextEncoder().encode(body).byteLength > MAX_REQUEST_BYTES) {
+      return Response.json({ error: 'Request is too large' }, { status: 413 });
+    }
+    input = JSON.parse(body);
   } catch {
     return Response.json({ error: 'Invalid JSON' }, { status: 400 });
   }
@@ -195,9 +190,12 @@ export async function POST(request: Request): Promise<Response> {
   if (!valid) return Response.json({ error: 'Invalid request' }, { status: 400 });
 
   const prompt = promptFor(valid);
+  const deadline = Date.now() + (valid.action === 'sos' ? SOS_DEADLINE_MS : STANDARD_DEADLINE_MS);
   for (const provider of [callGemini, callMistral]) {
     try {
-      const data = validateResponse(valid.action, parseJson(await provider(prompt)));
+      const remainingMs = deadline - Date.now();
+      if (remainingMs < 500) break;
+      const data = validateResponse(valid.action, parseJson(await provider(prompt, remainingMs)));
       return Response.json({ data, source: 'ai' });
     } catch {
       // A provider can time out, rate limit, or violate the JSON contract. Try the next provider.

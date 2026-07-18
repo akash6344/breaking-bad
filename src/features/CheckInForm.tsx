@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { RangeField } from '../components/RangeField';
 import { requestCoach } from '../lib/coach';
 import { today } from '../lib/date';
@@ -18,6 +18,9 @@ export function CheckInForm({ profile, history, onSaved }: CheckInFormProps) {
   const [triggerError, setTriggerError] = useState('');
   const [resistedError, setResistedError] = useState('');
   const [requestError, setRequestError] = useState('');
+  const controllerRef = useRef<AbortController | null>(null);
+
+  useEffect(() => () => controllerRef.current?.abort(), []);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -29,16 +32,21 @@ export function CheckInForm({ profile, history, onSaved }: CheckInFormProps) {
     if (nextTriggerError || nextResistedError || resisted === null) return;
 
     setLoading(true);
+    controllerRef.current?.abort();
+    const controller = new AbortController();
+    controllerRef.current = controller;
     try {
       const payload = { mood, trigger: trigger.trim(), resisted };
-      const result = await requestCoach<NudgeResponse>({ action: 'checkin', profile, checkIn: payload, history });
+      const result = await requestCoach<NudgeResponse>({ action: 'checkin', profile, checkIn: payload, history }, controller.signal);
       onSaved({ id: crypto.randomUUID(), date: today(), ...payload }, result.data, result.source);
       setTrigger('');
       setResisted(null);
     } catch (caught) {
-      setRequestError(caught instanceof Error ? caught.message : 'Please try again.');
+      if (!(caught instanceof DOMException && caught.name === 'AbortError')) {
+        setRequestError(caught instanceof Error ? caught.message : 'Please try again.');
+      }
     } finally {
-      setLoading(false);
+      if (controllerRef.current === controller) setLoading(false);
     }
   }
 

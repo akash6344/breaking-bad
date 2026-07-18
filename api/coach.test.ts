@@ -58,6 +58,31 @@ describe('coach API contract', () => {
     expect(providerFetch).not.toHaveBeenCalled();
   });
 
+  it('rejects oversized payloads before contacting a provider', async () => {
+    const providerFetch = vi.fn<typeof fetch>();
+    vi.stubGlobal('fetch', providerFetch);
+
+    const response = await POST(coachRequest({
+      action: 'sos',
+      profile: { ...profile, goal: 'x'.repeat(8_100) },
+      intensity: 5,
+      history: [],
+    }));
+
+    expect(response.status).toBe(413);
+    expect(providerFetch).not.toHaveBeenCalled();
+  });
+
+  it('requires JSON requests', async () => {
+    const request = new Request('https://breakfree.test/api/coach', {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: 'not-json',
+    });
+
+    expect((await POST(request)).status).toBe(415);
+  });
+
   it('labels deterministic guidance as offline when providers fail', async () => {
     vi.stubEnv('GEMINI_API_KEY', 'test-gemini-key');
     vi.stubEnv('MISTRAL_API_KEY', 'test-mistral-key');

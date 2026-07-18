@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { BreathingLoader } from './components/BreathingLoader';
 import { NudgeCard, SOSCard, WeeklyCard } from './components/CoachCards';
 import { RangeField } from './components/RangeField';
@@ -6,7 +6,7 @@ import { ResetPlanDialog } from './components/ResetPlanDialog';
 import { CheckInForm } from './features/CheckInForm';
 import { Onboarding } from './features/Onboarding';
 import { requestCoach } from './lib/coach';
-import { clearBreakFreeData, daysSinceGoalStarted, loadCheckIns, loadProfile, recentCheckIns, saveCheckIns, saveProfile } from './lib/storage';
+import { clearBreakFreeData, daysSinceGoalStarted, loadCheckIns, loadProfile, MAX_RECENT_CHECK_INS, MAX_STORED_CHECK_INS, recentCheckIns, saveCheckIns, saveProfile } from './lib/storage';
 import type { CheckIn, CoachSource, HabitProfile, NudgeResponse, SOSResponse, WeeklySummary } from './types';
 
 export default function App() {
@@ -22,33 +22,67 @@ export default function App() {
   const [weeklyError, setWeeklyError] = useState('');
   const [weeklyGeneratedAt, setWeeklyGeneratedAt] = useState('');
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const sosController = useRef<AbortController | null>(null);
+  const weeklyController = useRef<AbortController | null>(null);
   const recent = useMemo(() => recentCheckIns(checkIns), [checkIns]);
+  const hasWeeklyEvidence = new Set(recent.map((entry) => entry.date)).size >= 3;
 
-  if (!profile) return <Onboarding onComplete={(next) => { saveProfile(next); setProfile(next); }} />;
+  useEffect(() => () => {
+    sosController.current?.abort();
+    weeklyController.current?.abort();
+  }, []);
+
+  if (!profile) {
+    return <Onboarding onComplete={(next) => {
+      const outcome = saveProfile(next);
+      if (outcome.ok) setProfile(next);
+      return outcome;
+    }} />;
+  }
   const activeProfile: HabitProfile = profile;
   const days = daysSinceGoalStarted(activeProfile.startDate);
 
   async function getSOS() {
+    sosController.current?.abort();
+    const controller = new AbortController();
+    sosController.current = controller;
     setSosLoading(true); setSosError('');
-    try { setSos(await requestCoach<SOSResponse>({ action: 'sos', profile: activeProfile, intensity, history: recent })); }
-    catch (caught) { setSosError(caught instanceof Error ? caught.message : 'Please try again.'); }
-    finally { setSosLoading(false); }
+    try {
+      setSos(await requestCoach<SOSResponse>({ action: 'sos', profile: activeProfile, intensity, history: recent }, controller.signal));
+    } catch (caught) {
+      if (!(caught instanceof DOMException && caught.name === 'AbortError')) {
+        setSosError(caught instanceof Error ? caught.message : 'Please try again.');
+      }
+    } finally {
+      if (sosController.current === controller) setSosLoading(false);
+    }
   }
 
   async function getWeekly() {
+    if (!hasWeeklyEvidence) return;
+    weeklyController.current?.abort();
+    const controller = new AbortController();
+    weeklyController.current = controller;
     setWeeklyLoading(true); setWeeklyError('');
     try {
-      setWeekly(await requestCoach<WeeklySummary>({ action: 'weekly', profile: activeProfile, history: recent }));
+      setWeekly(await requestCoach<WeeklySummary>({ action: 'weekly', profile: activeProfile, history: recent }, controller.signal));
       setWeeklyGeneratedAt(new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }));
     } catch (caught) {
-      setWeeklyError(caught instanceof Error ? caught.message : 'Please try again.');
+      if (!(caught instanceof DOMException && caught.name === 'AbortError')) {
+        setWeeklyError(caught instanceof Error ? caught.message : 'Please try again.');
+      }
+    } finally {
+      if (weeklyController.current === controller) setWeeklyLoading(false);
     }
-    finally { setWeeklyLoading(false); }
   }
 
   function saveCheckIn(checkIn: CheckIn, response: NudgeResponse, source: CoachSource) {
     const next = [...checkIns.filter((entry) => entry.date !== checkIn.date), checkIn];
-    saveCheckIns(next);
+    const outcome = saveCheckIns(next);
+    if (!outcome.ok) {
+      setWeeklyError(outcome.message);
+      return;
+    }
     setCheckIns(next);
     setNudge({ data: response, source });
     setWeekly(null);
@@ -57,6 +91,8 @@ export default function App() {
   }
 
   function resetPlan() {
+    sosController.current?.abort();
+    weeklyController.current?.abort();
     clearBreakFreeData();
     setProfile(null);
     setCheckIns([]);
@@ -80,11 +116,11 @@ export default function App() {
     <CheckInForm profile={activeProfile} history={recent} onSaved={saveCheckIn} />
     {nudge && <NudgeCard response={nudge.data} source={nudge.source} />}
     <section className="panel progress-panel">
-      <div><p className="eyebrow">Your record</p><h2>Evidence of showing up</h2><p>{recent.length ? 'Your last five check-ins are stored only in this browser.' : 'Your first honest check-in will appear here.'}</p></div>
+      <div><p className="eyebrow">Your record</p><h2>Evidence of showing up</h2><p>{recent.length ? `Your last ${MAX_RECENT_CHECK_INS} check-ins are shown here. Up to ${MAX_STORED_CHECK_INS} are kept locally in this browser.` : 'Your first honest check-in will appear here.'}</p></div>
       <div className="progress-content">
         {recent.length > 0 && <ul>{recent.map((entry) => <li key={entry.id}><time dateTime={entry.date}>{entry.date}</time><span>Mood {entry.mood}/5</span><span>{entry.resisted ? 'Paused / resisted' : 'A lapse happened'}</span></li>)}</ul>}
-        <button className="secondary" onClick={getWeekly} disabled={weeklyLoading || !recent.length} aria-busy={weeklyLoading}>{weeklyLoading ? 'Finding a pattern…' : weekly ? 'Refresh weekly perspective' : 'Get weekly perspective'}</button>
-        {!recent.length && <p className="fine-print">Log one check-in to unlock a perspective based on your real experience.</p>}
+        <button className="secondary" onClick={getWeekly} disabled={weeklyLoading || !hasWeeklyEvidence} aria-busy={weeklyLoading}>{weeklyLoading ? 'Finding a pattern…' : weekly ? 'Refresh weekly perspective' : 'Get weekly perspective'}</button>
+        {!hasWeeklyEvidence && <p className="fine-print">Log check-ins on three different days to unlock a perspective based on enough real experience.</p>}
         {weeklyGeneratedAt && <p className="fine-print">Last generated today at {weeklyGeneratedAt}.</p>}
         {weeklyError && <p className="form-error" role="alert">{weeklyError}</p>}
       </div>

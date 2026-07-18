@@ -50,6 +50,14 @@ describe('BreakFree onboarding', () => {
     expect(mockedRequestCoach).not.toHaveBeenCalled();
   });
 
+  it('does not present a weekly trend until there is enough dated evidence', () => {
+    render(<App />);
+    completeOnboarding();
+
+    expect(screen.getByRole('button', { name: 'Get weekly perspective' })).toBeDisabled();
+    expect(screen.getByText(/Log check-ins on three different days/)).toBeInTheDocument();
+  });
+
   it('clears generated advice when a plan is reset without clearing unrelated storage', async () => {
     mockedRequestCoach.mockResolvedValue({
       source: 'ai',

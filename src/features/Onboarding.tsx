@@ -1,8 +1,9 @@
 import { useState, type FormEvent } from 'react';
 import { today } from '../lib/date';
 import type { HabitProfile } from '../types';
+import type { StorageOutcome } from '../lib/storage';
 
-export function Onboarding({ onComplete }: { onComplete: (profile: HabitProfile) => void }) {
+export function Onboarding({ onComplete }: { onComplete: (profile: HabitProfile) => StorageOutcome }) {
   const [form, setForm] = useState({ habitName: '', trigger: '', goal: '', riskTime: '' });
   const [error, setError] = useState('');
 
@@ -17,7 +18,14 @@ export function Onboarding({ onComplete }: { onComplete: (profile: HabitProfile)
       setError('Please complete all four fields.');
       return;
     }
-    onComplete({ ...form, startDate: today() });
+    const outcome = onComplete({
+      habitName: form.habitName.trim(),
+      trigger: form.trigger.trim(),
+      goal: form.goal.trim(),
+      riskTime: form.riskTime.trim(),
+      startDate: today(),
+    });
+    if (!outcome.ok) setError(outcome.message);
   }
 
   return <main className="onboarding-shell">
