@@ -34,7 +34,8 @@ header, .summary, .sos-panel { display: flex; gap: 20px; }
 header { align-items: center; justify-content: space-between; padding: 4px 0 12px; }
 header h1 { font-size: clamp(1.8rem, 4vw, 3rem); margin-bottom: 0; letter-spacing: -.04em; }
 .text-button { background: none; border: 0; color: #5c716b; text-decoration: underline; }
-.reset-confirm { border: 2px solid #c65c38; border-radius: 18px; padding: 24px; background: #fffefa; }
+.reset-confirm { width: min(650px, calc(100% - 40px)); color: #153a35; border: 2px solid #c65c38; border-radius: 18px; padding: 24px; background: #fffefa; }
+.reset-confirm::backdrop { background: rgb(11 43 38 / 55%); }
 .reset-confirm h2 { margin-bottom: 8px; }
 .reset-confirm p { max-width: 650px; line-height: 1.5; }
 .dialog-actions { display: flex; gap: 10px; flex-wrap: wrap; }
@@ -63,6 +64,9 @@ header h1 { font-size: clamp(1.8rem, 4vw, 3rem); margin-bottom: 0; letter-spacin
 .breathing { min-width: 230px; display: grid; justify-items: center; gap: 8px; color: #f5f3ea; }
 .breathing strong { display: grid; place-items: center; border: 2px solid #f2b58e; border-radius: 50%; width: 130px; height: 130px; font-size: 2.4rem; animation: breathe 4s ease-in-out infinite; }
 @keyframes breathe { 50% { transform: scale(1.18); } }
+@media (prefers-reduced-motion: reduce) {
+  .breathing strong { animation: none; }
+}
 .panel { display: grid; grid-template-columns: .8fr 1.2fr; gap: 34px; }
 .panel h2 { font-size: 1.5rem; letter-spacing: -.03em; }
 .checkin-panel form { display: grid; gap: 15px; }

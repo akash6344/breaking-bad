@@ -1,5 +1,8 @@
 import type { CheckIn, HabitProfile } from '../types';
 
+// Local persistence is deliberate data minimization: this single-device micro-app
+// needs no account or server-side profile database. Only these app-owned keys are
+// retained, and coaching context is sent to the AI only when the user requests it.
 const PROFILE_KEY = 'breakfree.profile';
 const CHECKINS_KEY = 'breakfree.checkins';
 
