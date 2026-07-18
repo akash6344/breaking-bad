@@ -6,6 +6,7 @@ import { ResetPlanDialog } from './components/ResetPlanDialog';
 import { CheckInForm } from './features/CheckInForm';
 import { Onboarding } from './features/Onboarding';
 import { requestCoach } from './lib/coach';
+import { resistStreak, todayFocusMessage } from './lib/streak';
 import { clearBreakFreeData, daysSinceGoalStarted, loadCheckIns, loadProfile, MAX_RECENT_CHECK_INS, MAX_STORED_CHECK_INS, recentCheckIns, saveCheckIns, saveProfile } from './lib/storage';
 import type { CheckIn, CoachSource, HabitProfile, NudgeResponse, SOSResponse, WeeklySummary } from './types';
 
@@ -22,10 +23,17 @@ export default function App() {
   const [weeklyError, setWeeklyError] = useState('');
   const [weeklyGeneratedAt, setWeeklyGeneratedAt] = useState('');
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [storageError, setStorageError] = useState('');
   const sosController = useRef<AbortController | null>(null);
   const weeklyController = useRef<AbortController | null>(null);
   const recent = useMemo(() => recentCheckIns(checkIns), [checkIns]);
   const hasWeeklyEvidence = new Set(recent.map((entry) => entry.date)).size >= 3;
+  const streak = useMemo(() => resistStreak(checkIns), [checkIns]);
+  const days = profile ? daysSinceGoalStarted(profile.startDate) : 0;
+  const focusMessage = useMemo(
+    () => (profile ? todayFocusMessage(profile.riskTime, profile.goal, checkIns) : ''),
+    [checkIns, profile],
+  );
 
   useEffect(() => () => {
     sosController.current?.abort();
@@ -40,7 +48,6 @@ export default function App() {
     }} />;
   }
   const activeProfile: HabitProfile = profile;
-  const days = daysSinceGoalStarted(activeProfile.startDate);
 
   async function getSOS() {
     sosController.current?.abort();
@@ -80,14 +87,16 @@ export default function App() {
     const next = [...checkIns.filter((entry) => entry.date !== checkIn.date), checkIn];
     const outcome = saveCheckIns(next);
     if (!outcome.ok) {
-      setWeeklyError(outcome.message);
+      setStorageError(outcome.message);
       return;
     }
+    setStorageError('');
     setCheckIns(next);
     setNudge({ data: response, source });
     setWeekly(null);
     setWeeklyGeneratedAt('');
     setWeeklyError('');
+    setStorageError('');
   }
 
   function resetPlan() {
@@ -111,9 +120,10 @@ export default function App() {
   return <main className="app-shell">
     <header><div><p className="eyebrow">BreakFree</p><h1>Hello. Keep it small today.</h1></div><button className="text-button" onClick={() => setShowResetConfirm(true)}>Reset plan</button></header>
     {showResetConfirm && <ResetPlanDialog onCancel={() => setShowResetConfirm(false)} onConfirm={resetPlan} />}
-    <section className="summary" aria-label="Your progress"><div><span>{days}</span><p>days since you started<br />{profile.goal}</p></div><div><strong>Today’s focus</strong><p>{profile.riskTime} can be a high-risk time. Prepare before it arrives.</p></div></section>
+    <section className="summary" aria-label="Your progress"><div><span>{streak}</span><p>day resist streak<br />{checkIns.length ? 'based on your check-ins' : 'log a check-in to begin'}</p></div><div><span>{days}</span><p>days since you started<br />{profile.goal}</p></div><div><strong>Today’s focus</strong><p>{focusMessage}</p></div></section>
     <section className="sos-panel" aria-labelledby="sos-title"><div><p className="eyebrow">SOS mode</p><h2 id="sos-title">A craving is a wave. Let’s get through this one.</h2><RangeField id="craving-intensity" label="How intense is it?" value={intensity} min={1} max={10} minLabel="Manageable" maxLabel="Overwhelming" onChange={setIntensity} /><button className="sos-button" onClick={getSOS} disabled={sosLoading} aria-busy={sosLoading}>{sosLoading ? 'Stay with your breath…' : 'I need support now'}</button>{sosError && <p className="form-error" role="alert">{sosError}</p>}</div>{sosLoading ? <BreathingLoader /> : sos && <SOSCard response={sos.data} source={sos.source} />}</section>
     <CheckInForm profile={activeProfile} history={recent} onSaved={saveCheckIn} />
+    {storageError && <p className="form-error" role="alert">{storageError}</p>}
     {nudge && <NudgeCard response={nudge.data} source={nudge.source} />}
     <section className="panel progress-panel">
       <div><p className="eyebrow">Your record</p><h2>Evidence of showing up</h2><p>{recent.length ? `Your last ${MAX_RECENT_CHECK_INS} check-ins are shown here. Up to ${MAX_STORED_CHECK_INS} are kept locally in this browser.` : 'Your first honest check-in will appear here.'}</p></div>

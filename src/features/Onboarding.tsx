@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react';
+import { sanitizeText } from '../lib/sanitize';
 import { today } from '../lib/date';
 import type { HabitProfile } from '../types';
 import type { StorageOutcome } from '../lib/storage';
@@ -19,10 +20,10 @@ export function Onboarding({ onComplete }: { onComplete: (profile: HabitProfile)
       return;
     }
     const outcome = onComplete({
-      habitName: form.habitName.trim(),
-      trigger: form.trigger.trim(),
-      goal: form.goal.trim(),
-      riskTime: form.riskTime.trim(),
+      habitName: sanitizeText(form.habitName),
+      trigger: sanitizeText(form.trigger),
+      goal: sanitizeText(form.goal),
+      riskTime: sanitizeText(form.riskTime),
       startDate: today(),
     });
     if (!outcome.ok) setError(outcome.message);

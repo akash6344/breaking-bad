@@ -7,9 +7,9 @@ function SourceNotice({ source }: { source: CoachSource }) {
 }
 
 export function SOSCard({ response, source }: { response: SOSResponse; source: CoachSource }) {
-  return <section className="coach-card" aria-live="polite">
+  return <section className="coach-card" aria-live="polite" aria-atomic="true">
     <SourceNotice source={source} />
-    <h2>{response.acknowledgment}</h2>
+    <p className="coach-lead">{response.acknowledgment}</p>
     <div><h3>Ride the wave</h3><p>{response.urgeSurfing}</p></div>
     <div><h3>Do this now</h3><p>{response.replacementAction}</p></div>
     <div><h3>A thought to hold</h3><p>{response.cognitiveReframe}</p></div>

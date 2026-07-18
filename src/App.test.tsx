@@ -58,6 +58,26 @@ describe('BreakFree onboarding', () => {
     expect(screen.getByText(/Log check-ins on three different days/)).toBeInTheDocument();
   });
 
+  it('renders SOS guidance after a successful coach request', async () => {
+    mockedRequestCoach.mockResolvedValue({
+      source: 'ai',
+      data: {
+        acknowledgment: 'This urge makes sense.',
+        urgeSurfing: 'Breathe slowly for one minute.',
+        replacementAction: 'Step outside for fresh air.',
+        cognitiveReframe: 'The urge will pass.',
+        intensityAdvice: '',
+      },
+    });
+    render(<App />);
+    completeOnboarding();
+
+    fireEvent.click(screen.getByRole('button', { name: 'I need support now' }));
+
+    expect(await screen.findByText('Step outside for fresh air.')).toBeInTheDocument();
+    expect(screen.getByText('This urge makes sense.')).toBeInTheDocument();
+  });
+
   it('clears generated advice when a plan is reset without clearing unrelated storage', async () => {
     mockedRequestCoach.mockResolvedValue({
       source: 'ai',

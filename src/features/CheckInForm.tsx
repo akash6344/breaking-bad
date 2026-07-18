@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { RangeField } from '../components/RangeField';
 import { requestCoach } from '../lib/coach';
+import { sanitizeText } from '../lib/sanitize';
 import { today } from '../lib/date';
 import type { CheckIn, CoachSource, HabitProfile, NudgeResponse } from '../types';
 
@@ -36,7 +37,7 @@ export function CheckInForm({ profile, history, onSaved }: CheckInFormProps) {
     const controller = new AbortController();
     controllerRef.current = controller;
     try {
-      const payload = { mood, trigger: trigger.trim(), resisted };
+      const payload = { mood, trigger: sanitizeText(trigger), resisted };
       const result = await requestCoach<NudgeResponse>({ action: 'checkin', profile, checkIn: payload, history }, controller.signal);
       onSaved({ id: crypto.randomUUID(), date: today(), ...payload }, result.data, result.source);
       setTrigger('');

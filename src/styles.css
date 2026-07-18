@@ -41,9 +41,9 @@ header h1 { font-size: clamp(1.8rem, 4vw, 3rem); margin-bottom: 0; letter-spacin
 .dialog-actions { display: flex; gap: 10px; flex-wrap: wrap; }
 .danger-button { border: 0; border-radius: 999px; padding: 14px 20px; font-weight: 800; background: #a52f1c; color: #fff; }
 .danger-button:hover { background: #852313; }
-.summary { align-items: stretch; }
-.summary > div { flex: 1; padding: 23px; border-radius: 15px; background: #dceae2; }
-.summary > div:first-child { display: flex; gap: 18px; align-items: center; background: #e9d7b5; }
+.summary { align-items: stretch; flex-wrap: wrap; }
+.summary > div { flex: 1; min-width: 180px; padding: 23px; border-radius: 15px; background: #dceae2; }
+.summary > div:nth-child(2) { background: #e9d7b5; }
 .summary span { font-weight: 850; font-size: 3rem; line-height: 1; }
 .summary p { margin: 0; line-height: 1.5; }
 .summary strong { display: block; margin-bottom: 7px; }
@@ -56,6 +56,7 @@ header h1 { font-size: clamp(1.8rem, 4vw, 3rem); margin-bottom: 0; letter-spacin
 .sos-button:hover { background: #d45b2d; }
 .coach-card { color: #153a35; flex: 1; min-width: 300px; }
 .coach-card h2 { font-size: 1.2rem; line-height: 1.35; }
+.coach-lead { font-size: 1.2rem; line-height: 1.35; font-weight: 700; margin: 0 0 12px; }
 .coach-card h3 { font-size: .8rem; text-transform: uppercase; letter-spacing: .09em; color: #bb5330; margin: 18px 0 6px; }
 .coach-card p, .nudge-card p, .weekly-card p { line-height: 1.5; }
 .ai-note, .offline-note { font-size: .78rem; font-weight: 750; }
