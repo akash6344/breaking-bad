@@ -97,3 +97,14 @@ export function isCoachResultForAction(action: CoachAction, value: unknown): val
   if (!isCoachResult(value)) return false;
   return validateCoachResponseData(action, value.data as unknown as Record<string, unknown>) !== null;
 }
+
+/** Shared client/server text cleaning: strip angle brackets, trim, and bound length. */
+export function sanitizeText(value: string): string {
+  return value.replace(/[<>]/g, '').trim().slice(0, MAX_TEXT_LENGTH);
+}
+
+export function cleanOptionalText(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const cleaned = sanitizeText(value);
+  return cleaned.length ? cleaned : null;
+}

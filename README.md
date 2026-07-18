@@ -21,7 +21,7 @@ API credentials are server-only variables and must never use Vite's `VITE_` pref
 ## Architecture and evaluation map
 
 - **Problem alignment:** onboarding captures a habit, trigger, goal, and risk time; SOS coaching, adaptive check-in nudges, and history-based perspectives use that context.
-- **Code quality:** custom `useHabit` / `useCoach` hooks, feature panels, shared coach contracts, error boundaries around AI cards, and typed modules under `src/`.
+- **Code quality:** custom `useHabit` / `useCoach` hooks, shared sanitize/sort/error helpers, feature panels, colocated coach contracts, error boundaries around AI cards, and typed modules under `src/`.
 - **Security:** `/api/coach` validates bounded input, keeps provider keys server-side, treats user context as untrusted prompt data, validates model output, and deploys with restrictive browser headers.
 - **Efficiency:** Progress is lazy-loaded, coach handlers use stable callbacks with request abort, only five recent check-ins are sent from the UI, and API history/output/body size plus action-aware deadlines keep SOS responsive.
 - **Testing:** component, storage, API contract, and client response-validation tests cover user flows and failure-sensitive boundaries.

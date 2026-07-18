@@ -1,3 +1,4 @@
+import { sortCheckInsNewestFirst } from './checkIns';
 import { isValidCalendarDate } from './date';
 import type { CheckIn, HabitProfile } from '../types';
 
@@ -96,5 +97,5 @@ export function daysSinceGoalStarted(startDate: string): number {
 }
 
 export function recentCheckIns(checkIns: CheckIn[]): CheckIn[] {
-  return [...checkIns].sort((a, b) => b.date.localeCompare(a.date)).slice(0, MAX_RECENT_CHECK_INS);
+  return sortCheckInsNewestFirst(checkIns).slice(0, MAX_RECENT_CHECK_INS);
 }

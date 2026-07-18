@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { requestCoach } from '../lib/coach';
+import { isAbortError, toUserErrorMessage } from '../lib/errors';
 import type { CoachRequest, CoachResponse, CoachResult } from '../types';
 
 export function useCoach<T extends CoachResponse>() {
@@ -35,9 +36,7 @@ export function useCoach<T extends CoachResponse>() {
       setGeneratedAt(new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }));
       return next;
     } catch (caught) {
-      if (!(caught instanceof DOMException && caught.name === 'AbortError')) {
-        setError(caught instanceof Error ? caught.message : 'Please try again.');
-      }
+      if (!isAbortError(caught)) setError(toUserErrorMessage(caught));
       return null;
     } finally {
       if (controllerRef.current === controller) setLoading(false);

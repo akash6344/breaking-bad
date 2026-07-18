@@ -1,9 +1,9 @@
+import { sortCheckInsNewestFirst } from './checkIns';
 import type { CheckIn } from '../types';
 
 export function resistStreak(checkIns: CheckIn[]): number {
-  const sorted = [...checkIns].sort((a, b) => b.date.localeCompare(a.date));
   let streak = 0;
-  for (const entry of sorted) {
+  for (const entry of sortCheckInsNewestFirst(checkIns)) {
     if (!entry.resisted) break;
     streak += 1;
   }
@@ -11,8 +11,7 @@ export function resistStreak(checkIns: CheckIn[]): number {
 }
 
 export function latestCheckIn(checkIns: CheckIn[]): CheckIn | null {
-  if (!checkIns.length) return null;
-  return [...checkIns].sort((a, b) => b.date.localeCompare(a.date))[0];
+  return sortCheckInsNewestFirst(checkIns)[0] ?? null;
 }
 
 export function todayFocusMessage(
@@ -20,8 +19,14 @@ export function todayFocusMessage(
   goal: string,
   checkIns: CheckIn[],
 ): string {
-  const latest = latestCheckIn(checkIns);
-  const streak = resistStreak(checkIns);
+  // One sort feeds both latest-entry and streak reads.
+  const newestFirst = sortCheckInsNewestFirst(checkIns);
+  const latest = newestFirst[0] ?? null;
+  let streak = 0;
+  for (const entry of newestFirst) {
+    if (!entry.resisted) break;
+    streak += 1;
+  }
 
   if (latest && !latest.resisted) {
     return `Your latest check-in noted a lapse around “${latest.trigger}.” That does not erase your goal: ${goal}.`;

@@ -1,7 +1,7 @@
 import {
+  cleanOptionalText,
   MAX_HISTORY,
   MAX_REQUEST_BYTES,
-  MAX_TEXT_LENGTH,
   validateCoachResponseData,
   type CoachAction,
   type CoachCheckIn,
@@ -19,12 +19,6 @@ interface ValidRequest {
 const SOS_DEADLINE_MS = 5_000;
 const STANDARD_DEADLINE_MS = 8_000;
 
-function cleanText(value: unknown): string | null {
-  if (typeof value !== 'string') return null;
-  const cleaned = value.replace(/[<>]/g, '').trim().slice(0, MAX_TEXT_LENGTH);
-  return cleaned.length ? cleaned : null;
-}
-
 function parseRequest(input: unknown): ValidRequest | null {
   if (!input || typeof input !== 'object') return null;
   const body = input as Record<string, unknown>;
@@ -32,11 +26,11 @@ function parseRequest(input: unknown): ValidRequest | null {
   const rawProfile = body.profile as Record<string, unknown> | undefined;
   if (!rawProfile) return null;
   const profile: HabitProfile = {
-    habitName: cleanText(rawProfile.habitName) ?? '',
-    trigger: cleanText(rawProfile.trigger) ?? '',
-    goal: cleanText(rawProfile.goal) ?? '',
-    riskTime: cleanText(rawProfile.riskTime) ?? '',
-    startDate: cleanText(rawProfile.startDate) ?? '',
+    habitName: cleanOptionalText(rawProfile.habitName) ?? '',
+    trigger: cleanOptionalText(rawProfile.trigger) ?? '',
+    goal: cleanOptionalText(rawProfile.goal) ?? '',
+    riskTime: cleanOptionalText(rawProfile.riskTime) ?? '',
+    startDate: cleanOptionalText(rawProfile.startDate) ?? '',
   };
   if (Object.values(profile).some((value) => !value)) return null;
 
@@ -45,7 +39,7 @@ function parseRequest(input: unknown): ValidRequest | null {
   const checkIn = rawCheckIn
     ? {
         mood: Math.min(5, Math.max(1, Number(rawCheckIn.mood))),
-        trigger: cleanText(rawCheckIn.trigger) ?? '',
+        trigger: cleanOptionalText(rawCheckIn.trigger) ?? '',
         resisted: rawCheckIn.resisted === true,
       }
     : undefined;
@@ -55,8 +49,8 @@ function parseRequest(input: unknown): ValidRequest | null {
   const history = Array.isArray(body.history)
     ? body.history.slice(-MAX_HISTORY).flatMap((item) => {
         const entry = item as Record<string, unknown>;
-        const date = cleanText(entry.date);
-        const trigger = cleanText(entry.trigger);
+        const date = cleanOptionalText(entry.date);
+        const trigger = cleanOptionalText(entry.trigger);
         const mood = Number(entry.mood);
         return date && trigger && Number.isInteger(mood) && mood >= 1 && mood <= 5
           ? [{ date, trigger, mood, resisted: entry.resisted === true }]
