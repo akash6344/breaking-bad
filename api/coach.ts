@@ -6,7 +6,7 @@ import {
   type CoachAction,
   type CoachCheckIn,
   type HabitProfile,
-} from '../src/lib/coach-contract';
+} from './coach-contract.js';
 
 interface ValidRequest {
   action: CoachAction;

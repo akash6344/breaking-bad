@@ -10,5 +10,5 @@
     "strict": true,
     "skipLibCheck": true
   },
-  "include": ["api/coach.ts"]
+  "include": ["api/coach.ts", "api/coach-contract.ts"]
 }

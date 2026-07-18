@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { POST } from './coach';
+import { POST } from '../../api/coach';
 
 const profile = {
   habitName: 'Late-night scrolling',

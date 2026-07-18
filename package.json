@@ -8,7 +8,7 @@
     "dev:full": "vercel dev",
     "build": "tsc -b && vite build",
     "typecheck": "tsc -b --pretty",
-    "lint": "eslint src api",
+    "lint": "eslint src api tests",
     "test": "vitest run",
     "test:watch": "vitest"
   },
