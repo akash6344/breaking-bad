@@ -50,11 +50,12 @@ describe('BreakFree onboarding', () => {
     expect(mockedRequestCoach).not.toHaveBeenCalled();
   });
 
-  it('does not present a weekly trend until there is enough dated evidence', () => {
+  it('does not present a weekly trend until there is enough dated evidence', async () => {
     render(<App />);
     completeOnboarding();
 
-    expect(screen.getByRole('button', { name: 'Get weekly perspective' })).toBeDisabled();
+    const weeklyButton = await screen.findByRole('button', { name: 'Get weekly perspective' });
+    expect(weeklyButton).toBeDisabled();
     expect(screen.getByText(/Log check-ins on three different days/)).toBeInTheDocument();
   });
 

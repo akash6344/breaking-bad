@@ -18,7 +18,7 @@ export function SOSCard({ response, source }: { response: SOSResponse; source: C
 }
 
 export function NudgeCard({ response, source }: { response: NudgeResponse; source: CoachSource }) {
-  return <section className="nudge-card" aria-live="polite">
+  return <section className="nudge-card" aria-live="polite" aria-atomic="true">
     <SourceNotice source={source} />
     <h2>Your next small step</h2>
     <p>{response.insight}</p>
@@ -29,7 +29,7 @@ export function NudgeCard({ response, source }: { response: NudgeResponse; sourc
 }
 
 export function WeeklyCard({ response, source }: { response: WeeklySummary; source: CoachSource }) {
-  return <section className="weekly-card" aria-live="polite">
+  return <section className="weekly-card" aria-live="polite" aria-atomic="true">
     <SourceNotice source={source} />
     <p className={`trend ${response.trend}`}>{response.trend}</p>
     <h2>Weekly perspective</h2>
